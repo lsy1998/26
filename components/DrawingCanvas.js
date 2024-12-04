@@ -1417,6 +1417,138 @@ const DrawingCanvas = () => {
     initializeCanvas();
   }, []); // 空依赖数组表示只在组件挂载时执行一次
 
+  // 修改触摸事件处理
+  const handleTouchStart = (e) => {
+    e.evt.preventDefault(); // 阻止默认滚动行为
+    
+    // 获取触摸点坐标
+    const touch = e.evt.touches[0];
+    const stage = e.target.getStage();
+    const pos = getRelativePointerPosition(stage);
+    
+    if (!pos) return;
+
+    // 如果点击在可交互元素上，不处理绘制
+    if (isOverImage || isOverPin || isOverText) {
+      return;
+    }
+
+    // 检查是否在纸张范围内
+    if (!isPointInPaper(pos)) return;
+
+    setIsDrawing(true);
+
+    if (!isErasing) {
+      const newLine = {
+        points: [pos.x, pos.y],
+        color: brushColor,
+        strokeWidth: BRUSH_TYPES[currentBrush].strokeWidth * brushRadius,
+        opacity: BRUSH_TYPES[currentBrush].opacity,
+        tension: BRUSH_TYPES[currentBrush].tension,
+      };
+      setLines([...lines, newLine]);
+    }
+
+    // 更新光标位置
+    setCursorPosition({
+      x: touch.clientX,
+      y: touch.clientY
+    });
+  };
+
+  const handleTouchMove = (e) => {
+    e.evt.preventDefault(); // 阻止默认滚动行为
+    
+    // 获取触摸点坐标
+    const touch = e.evt.touches[0];
+    const stage = e.target.getStage();
+    const pos = getRelativePointerPosition(stage);
+    
+    if (!pos) return;
+
+    // 更新光标位置
+    setCursorPosition({
+      x: touch.clientX,
+      y: touch.clientY
+    });
+
+    if (!isDrawing) return;
+
+    // 只在纸张范围内绘制
+    if (!isPointInPaper(pos)) return;
+
+    if (isErasing) {
+      const newLines = eraseLines(pos.x, pos.y, eraserRadius);
+      setLines(newLines);
+      return;
+    }
+
+    let lastLine = lines[lines.length - 1];
+    if (!lastLine) return;
+
+    // 更新最后一条线的点
+    const newPoints = [...lastLine.points, pos.x, pos.y];
+    const newLines = [...lines];
+    newLines[newLines.length - 1] = {
+      ...lastLine,
+      points: newPoints,
+    };
+    setLines(newLines);
+  };
+
+  const handleTouchEnd = (e) => {
+    e.evt.preventDefault(); // 阻止默认行为
+    setIsDrawing(false);
+  };
+
+  // 添加多指触控缩放和平移
+  const handleTouchPinch = (e) => {
+    e.evt.preventDefault();
+    
+    const touch1 = e.evt.touches[0];
+    const touch2 = e.evt.touches[1];
+    
+    if (touch1 && touch2) {
+      // 计算两个触摸点之间的距离
+      const dist = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      
+      if (!lastDist.current) {
+        lastDist.current = dist;
+        return;
+      }
+      
+      // 计算缩放比例
+      const scale = dist / lastDist.current;
+      
+      // 计算缩放中心点
+      const center = {
+        x: (touch1.clientX + touch2.clientX) / 2,
+        y: (touch1.clientY + touch2.clientY) / 2
+      };
+      
+      // 更新缩放
+      const newScale = Math.min(Math.max(scale * currentScale.current, 0.1), 5);
+      setScale(newScale);
+      currentScale.current = newScale;
+      
+      // 更新位置以保持缩放中心点不变
+      const newPos = {
+        x: center.x - (center.x - position.x) * scale,
+        y: center.y - (center.y - position.y) * scale
+      };
+      setPosition(newPos);
+      
+      lastDist.current = dist;
+    }
+  };
+
+  // 添加必要的 ref
+  const lastDist = useRef(null);
+  const currentScale = useRef(1);
+
   return (
     <>
       {isErasing && (
@@ -1438,9 +1570,9 @@ const DrawingCanvas = () => {
         onMouseUp={handleMouseUp}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        onTouchStart={handleMouseDown}
-        onTouchMove={handleMouseMove}
-        onTouchEnd={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         onWheel={handleWheel}
         ref={stageRef}
         scaleX={scale}
@@ -1450,7 +1582,10 @@ const DrawingCanvas = () => {
         style={{ 
           cursor: isDragging ? 'grabbing' : (isErasing ? 'none' : 'default'),
           touchAction: 'none',
-          userSelect: 'none'
+          userSelect: 'none',
+          WebkitTapHighlightColor: 'transparent', // 移除触摸时的高亮
+          WebkitTouchCallout: 'none', // 禁用长按菜单
+          WebkitUserSelect: 'none'
         }}
         onContextMenu={(e) => {
           e.evt.preventDefault();

@@ -1,25 +1,22 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Group, Transformer } from 'react-konva';
 
 const TransformableElement = ({
-  position,
+  position = { x: 0, y: 0 },
+  rotation = 0,
+  scale = { x: 1, y: 1 },
   isSelected,
   onSelect,
-  onDelete,
+  onTransformEnd,
   onDragMove,
   onMouseEnter,
   onMouseLeave,
   children,
-  initialRotation = 0,
-  initialScale = 1,
-  minScale = 0.5,
-  maxScale = 3,
-  baseSize = 20,
+  minScale = 0.1,
+  maxScale = 5,
 }) => {
   const elementRef = useRef(null);
   const transformerRef = useRef(null);
-  const [rotation, setRotation] = useState(initialRotation);
-  const [scale, setScale] = useState(initialScale);
 
   useEffect(() => {
     if (isSelected && transformerRef.current && elementRef.current) {
@@ -28,39 +25,18 @@ const TransformableElement = ({
     }
   }, [isSelected]);
 
-  const handleClick = (e) => {
-    e.cancelBubble = true;
-    onSelect?.(e);
-  };
-
-  const handleDragMove = (e) => {
-    e.cancelBubble = true;
-    onDragMove?.(e);
-  };
-
-  const handleTransform = (e) => {
-    e.cancelBubble = true;
+  const handleTransformEnd = (e) => {
     const node = elementRef.current;
     if (!node) return;
 
-    setRotation(node.rotation());
-    setScale(node.scaleX());
-
-    onDragMove?.({
-      target: node
+    onTransformEnd?.({
+      position: node.position(),
+      rotation: node.rotation(),
+      scale: {
+        x: node.scaleX(),
+        y: node.scaleY()
+      }
     });
-  };
-
-  const handleMouseEnter = (e) => {
-    e.cancelBubble = true;
-    e.target.getStage().container().style.cursor = 'pointer';
-    onMouseEnter?.();
-  };
-
-  const handleMouseLeave = (e) => {
-    e.cancelBubble = true;
-    e.target.getStage().container().style.cursor = 'default';
-    onMouseLeave?.();
   };
 
   return (
@@ -69,30 +45,45 @@ const TransformableElement = ({
         ref={elementRef}
         x={position.x}
         y={position.y}
-        draggable
         rotation={rotation}
-        scaleX={scale}
-        scaleY={scale}
-        onClick={handleClick}
-        onDragMove={handleDragMove}
-        onTransform={handleTransform}
-        onTransformEnd={handleTransform}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        scaleX={typeof scale === 'number' ? scale : scale.x}
+        scaleY={typeof scale === 'number' ? scale : scale.y}
+        draggable
+        onDragMove={onDragMove}
+        onTransformEnd={handleTransformEnd}
+        onMouseDown={(e) => {
+          e.cancelBubble = true;
+          onSelect?.(e);
+        }}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       >
         {children}
       </Group>
       {isSelected && (
         <Transformer
           ref={transformerRef}
-          rotateEnabled={true}
           boundBoxFunc={(oldBox, newBox) => {
-            const scaleX = newBox.width / (baseSize * initialScale);
-            if (scaleX < minScale || scaleX > maxScale) {
+            const scaleX = newBox.width / oldBox.width;
+            const scaleY = newBox.height / oldBox.height;
+            if (
+              scaleX < minScale || 
+              scaleY < minScale || 
+              scaleX > maxScale || 
+              scaleY > maxScale
+            ) {
               return oldBox;
             }
             return newBox;
           }}
+          rotateEnabled={true}
+          enabledAnchors={[
+            'top-left',
+            'top-right',
+            'bottom-left',
+            'bottom-right'
+          ]}
+          keepRatio={true}
         />
       )}
     </>

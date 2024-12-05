@@ -47,25 +47,109 @@ const DrawingCanvas = () => {
     isOverPin: selection.isOverPin,
     isOverText: selection.isOverText,
     isDrawing: canvas.isDrawing,
-    onTouchStart: (e) => {
-      setTouchStartTime(Date.now());
-      events.handleTouchStart(e);
-    },
-    onTouchMove: (e) => {
-      if (Date.now() - touchStartTime < LONG_PRESS_DURATION) {
-        events.handleTouchMove(e);
-      }
-    },
-    onTouchEnd: (e) => {
-      const touchDuration = Date.now() - touchStartTime;
-      if (touchDuration >= LONG_PRESS_DURATION) {
-        contextMenu.handleContextMenu(e, zoom.position, zoom.scale);
-      } else {
-        events.handleTouchEnd(e);
-      }
-      setTouchStartTime(0);
-    },
   });
+
+  // 触摸状态管理
+  const [touchState, setTouchState] = useState({
+    lastDistance: 0,
+    isDragging: false,
+    lastCenter: null,
+    startTime: 0,
+  });
+
+  const getDistance = (touch1, touch2) => {
+    return Math.sqrt(
+      Math.pow(touch2.clientX - touch1.clientX, 2) +
+      Math.pow(touch2.clientY - touch1.clientY, 2)
+    );
+  };
+
+  const getCenter = (touch1, touch2) => {
+    return {
+      x: (touch1.clientX + touch2.clientX) / 2,
+      y: (touch1.clientY + touch2.clientY) / 2,
+    };
+  };
+
+  const handleTouchStart = (e) => {
+    const touches = e.evt.touches;
+    
+    if (touches.length === 1) {
+      // 单指触摸 - 开始画画或准备拖动
+      setTouchState(prev => ({
+        ...prev,
+        startTime: Date.now(),
+        isDragging: false,
+      }));
+      events.handleTouchStart(e);
+    } else if (touches.length === 2) {
+      // 双指触摸 - 准备缩放
+      e.evt.preventDefault();
+      const distance = getDistance(touches[0], touches[1]);
+      const center = getCenter(touches[0], touches[1]);
+      
+      setTouchState(prev => ({
+        ...prev,
+        lastDistance: distance,
+        lastCenter: center,
+        isDragging: true,
+      }));
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    const touches = e.evt.touches;
+    
+    if (touches.length === 1 && !touchState.isDragging) {
+      // 单指移动 - 画画
+      events.handleTouchMove(e);
+    } else if (touches.length === 2) {
+      // 双指移动 - 处理缩放和平移
+      e.evt.preventDefault();
+      const distance = getDistance(touches[0], touches[1]);
+      const center = getCenter(touches[0], touches[1]);
+      
+      if (touchState.lastDistance > 0) {
+        // 处理缩放
+        const scale = distance / touchState.lastDistance;
+        const newScale = zoom.scale * scale;
+        if (newScale >= 0.1 && newScale <= 5) {
+          zoom.setScale(newScale);
+        }
+        
+        // 处理平移
+        if (touchState.lastCenter) {
+          const deltaX = center.x - touchState.lastCenter.x;
+          const deltaY = center.y - touchState.lastCenter.y;
+          zoom.setPosition({
+            x: zoom.position.x + deltaX,
+            y: zoom.position.y + deltaY,
+          });
+        }
+      }
+      
+      setTouchState(prev => ({
+        ...prev,
+        lastDistance: distance,
+        lastCenter: center,
+      }));
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    const touchDuration = Date.now() - touchState.startTime;
+    
+    if (!touchState.isDragging && touchDuration < LONG_PRESS_DURATION) {
+      events.handleTouchEnd(e);
+    }
+    
+    setTouchState({
+      lastDistance: 0,
+      isDragging: false,
+      lastCenter: null,
+      startTime: 0,
+    });
+  };
 
   const checkLineInViewport = useCallback((line) => {
     return isLineInViewport(
@@ -304,15 +388,18 @@ const DrawingCanvas = () => {
         }}
         onMouseEnter={events.handleMouseEnter}
         onMouseLeave={events.handleMouseLeave}
-        onTouchStart={events.handleTouchStart}
-        onTouchMove={events.handleTouchMove}
-        onTouchEnd={events.handleTouchEnd}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         onWheel={zoom.handleWheel}
         onContextMenu={(e) => contextMenu.handleContextMenu(e, zoom.position, zoom.scale)}
         isDragging={zoom.isDragging}
         isErasing={canvas.isErasing}
         style={{
-          touchAction: 'none', // 防止浏览器默认触摸行为
+          touchAction: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTapHighlightColor: 'transparent',
         }}
       >
         <Paper showCenterMark={true} />

@@ -113,18 +113,22 @@ const DrawingCanvas = () => {
         // 处理缩放
         const scale = distance / touchState.lastDistance;
         const newScale = zoom.scale * scale;
-        if (newScale >= 0.1 && newScale <= 5) {
-          zoom.setScale(newScale);
-        }
+        // 计算舞台坐标中的缩放中心点
+        const stage = stageRef.current.getStage();
+        const pointer = stage.getPointerPosition();
+        const mousePointTo = {
+          x: (pointer.x - zoom.position.x) / zoom.scale,
+          y: (pointer.y - zoom.position.y) / zoom.scale,
+        };
         
-        // 处理平移
-        if (touchState.lastCenter) {
-          const deltaX = center.x - touchState.lastCenter.x;
-          const deltaY = center.y - touchState.lastCenter.y;
-          zoom.setPosition({
-            x: zoom.position.x + deltaX,
-            y: zoom.position.y + deltaY,
-          });
+        if (newScale >= 0.1 && newScale <= 5) {
+          // 更新位置以保持鼠标位置不变
+          const newPos = {
+            x: pointer.x - mousePointTo.x * newScale,
+            y: pointer.y - mousePointTo.y * newScale,
+          };
+          zoom.setScale(newScale);
+          zoom.setPosition(newPos);
         }
       }
       

@@ -254,7 +254,10 @@ export const Toolbar = ({
           {Object.entries(BRUSH_TYPES).map(([type, brush]) => (
             <Tooltip key={type} title={brush.name} placement="left">
               <StyledIconButton
-                onClick={() => setCurrentBrush(type)}
+                onClick={() => {
+                  console.log('Changing brush from:', currentBrush, 'to:', type);
+                  setCurrentBrush(type);
+                }}
                 color={currentBrush === type ? 'primary' : 'default'}
               >
                 {brush.icon}

@@ -8,13 +8,20 @@ export const useCanvas = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [brushColor, setBrushColor] = useState('#000000');
   const [brushRadius, setBrushRadius] = useState(5);
-  const [currentBrush, setCurrentBrush] = useState('PENCIL');
+  const [currentBrush, setCurrentBrush] = useState(() => {
+    const savedBrush = localStorage.getItem('currentBrush');
+    return savedBrush || 'PENCIL';
+  });
   const [isErasing, setIsErasing] = useState(false);
   const [eraserRadius, setEraserRadius] = useState(20);
   const [isToolbarExpanded, setIsToolbarExpanded] = useState(true);
   const [images, setImages] = useState([]);
   const [pins, setPins] = useState([]);
   const [texts, setTexts] = useState([]);
+
+  useEffect(() => {
+    localStorage.setItem('currentBrush', currentBrush);
+  }, [currentBrush]);
 
   const addLine = useCallback((point) => {
     const newLine = {
@@ -23,6 +30,8 @@ export const useCanvas = () => {
       strokeWidth: BRUSH_TYPES[currentBrush].strokeWidth * brushRadius,
       opacity: BRUSH_TYPES[currentBrush].opacity,
       tension: BRUSH_TYPES[currentBrush].tension,
+      lineCap: currentBrush === 'PENCIL' ? 'square' : 'round',
+      lineJoin: currentBrush === 'PENCIL' ? 'miter' : 'round',
     };
     setLines(prevLines => [...prevLines, newLine]);
   }, [brushColor, currentBrush, brushRadius]);
@@ -143,35 +152,22 @@ export const useCanvas = () => {
     try {
       if (data.version) {
         setLines(data.lines || []);
-        setImages((data.images || []).map(img => ({
-          ...img,
-          position: img.position || { x: 0, y: 0 },
-          rotation: img.rotation || 0,
-          scale: img.scale || { x: 1, y: 1 }
-        })));
-        setPins((data.pins || []).map(pin => ({
-          ...pin,
-          position: pin.position || { x: 0, y: 0 },
-          rotation: pin.rotation || -90,
-          scale: pin.scale || { x: 1.5, y: 1.5 }
-        })));
-        setTexts((data.texts || []).map(text => ({
-          ...text,
-          position: text.position || { x: 0, y: 0 },
-          rotation: text.rotation || 0,
-          scale: text.scale || { x: 1, y: 1 }
-        })));
+        setImages(data.images || []);
+        setPins(data.pins || []);
+        setTexts(data.texts || []);
         if (data.settings) {
           setBrushColor(data.settings.brushColor || brushColor);
           setBrushRadius(data.settings.brushRadius || brushRadius);
-          setCurrentBrush(data.settings.currentBrush || currentBrush);
+          if (data.settings.currentBrush) {
+            setCurrentBrush(data.settings.currentBrush);
+          }
           setEraserRadius(data.settings.eraserRadius || eraserRadius);
         }
       }
     } catch (error) {
-      logger.error('Error loading canvas data:', error);
+      console.error('Error loading canvas data:', error);
     }
-  }, [brushColor, brushRadius, currentBrush, eraserRadius]);
+  }, [brushColor, brushRadius, eraserRadius]);
 
   const handleFileLoad = useCallback((e) => {
     const file = e.target.files?.[0];

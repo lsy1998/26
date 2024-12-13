@@ -229,6 +229,7 @@ export const Toolbar = ({
   hasSelectedElement,
   handleDeleteSelected,
   onExport,
+  uploadToServer,
 }) => {
   return (
     <ToolbarContainer expanded={isToolbarExpanded}>
@@ -319,6 +320,12 @@ export const Toolbar = ({
 
           <Tooltip title="保存" placement="left">
             <StyledIconButton onClick={saveCanvasData}>
+              <SaveIcon />
+            </StyledIconButton>
+          </Tooltip>
+
+          <Tooltip title="上传到服务器" placement="left">
+            <StyledIconButton onClick={uploadToServer}>
               <SaveIcon />
             </StyledIconButton>
           </Tooltip>

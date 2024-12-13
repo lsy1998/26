@@ -266,6 +266,9 @@ export const useCanvas = () => {
     }
   }, []);
 
+  const uploadToServer = useCallback(() => {
+    alert('上传到服务器');
+  }, []);
   // 初始化加载
   useEffect(() => {
     const loadInitialCanvas = async () => {
@@ -316,5 +319,6 @@ export const useCanvas = () => {
     eraseLines,
     exportVisibleArea,
     loadCanvasData,
+    uploadToServer,
   };
 }; 

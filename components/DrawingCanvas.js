@@ -192,6 +192,7 @@ const DrawingCanvas = () => {
       canvas.setPins,
       canvas.setTexts
     ),
+    uploadToServer: canvas.uploadToServer,
   };
 
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
